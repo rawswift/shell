@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# Copyright (C) 2013 Ryan Yonzon
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+config_dir="$HOME/.gms"
+certs_dir="$HOME/.gms/certs"
+gmail_cert_name="gmail.crt"
+
+usage="Usage: $(basename "$0")"
+
+if [ -d "$config_dir" ]; then
+    echo "Warning: ${config_dir} directory already exists."
+    exit    
+else
+    # create required directories
+    echo -n "Creating config directory ${config_dir}... "
+    mkdir $config_dir
+    echo "OK"
+    echo -n "Creating certificate directory ${certs_dir}... "
+    mkdir $certs_dir
+    echo "OK"
+
+    #
+    # locally creates self-signed CA and client certificates, certificate databases, and keys.
+    #
+    echo -n "Creating new certificate database..."
+    # create a new certificate database
+    certutil -N -d $certs_dir
+    echo "OK"
+    echo "Fetch cerficate from Gmail..."
+    # fetch cerficate from Gmail
+    echo -n | openssl s_client -connect smtp.gmail.com:465 | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > $certs_dir/$gmail_cert_name
+    # import the certificate to the database
+    certutil -A -n "Google Internet Authority" -t "C,," -d $certs_dir -i $certs_dir/$gmail_cert_name
+    # list all certs
+    certutil -L -d $certs_dir
+
+    echo "...Success!"
+fi

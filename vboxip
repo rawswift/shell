@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+# Copyright (C) 2013 Ryan Yonzon
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+device="vboxnet0"
+default="192.168.56.1/24"
+
+# check if device is up
+echo -n "Checking device ($device)... "
+string=$(ip addr | grep $device)
+if [[ "$string" == *$device* ]]; then
+    echo "OK"
+else
+    echo -e "Failed\n$device not found!"
+    exit
+fi
+
+# ask user for IP address and subnet mask
+echo "Enter IP address and subnet mask"
+read -p "Press Enter key to use default ($default): " ipsubnet
+
+if [ "$ipsubnet" != "" ]; then 
+    default=$ipsubnet
+fi
+
+echo "Setting $device IP/subnet ($default)... "
+
+# ...finally set device IP address/subnet mask
+sudo ip addr add $default dev $device
+echo "OK"
