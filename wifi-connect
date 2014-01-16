@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+# Copyright (C) 2014 Ryan Yonzon
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+counter=0
+ssid=
+
+echo 'Finding wireless interface...'
+winterface=$(iwconfig | awk '/[E]SSID/ {print $1}')
+if [ "$winterface" == "" ]; then
+	echo -e "\nNo wireless interface found! Exiting..."
+	exit
+fi
+
+echo "Wireless Interface found: ${winterface}"
+
+# make sure that the interface is Up
+ip link set $winterface up
+
+echo "Scanning wifi access point..."
+
+output=$(iw dev $winterface scan | grep SSID | cut -c8-)
+
+if [ "$output" == "" ]; then
+	echo -e "\nNo wireless access point found! Exiting..."
+	exit
+fi
+
+IFS=$'\n\b'
+for x in $output; do
+    ssid[$counter]="${x}"
+    counter=$((counter+1))
+done
+
+counter=0
+for v in ${ssid[@]}; do
+	echo "[${counter}]" $v
+	counter=$((counter+1))
+done
+
+# ask user which access point to connect to
+echo -n "Which AP to connect?: "
+read -p "" choice
+
+if [ "$choice" == "" ]; then
+	echo -e "\nNo choice has been made! Exiting..."
+	exit
+fi
+
+echo -n "[${ssid[choice]}] Password: "
+read -s -p "" password
+
+echo -e "\n"
+
+wpid=$(ps aux | awk '/[w]pa_supplicant/ {print $2}')
+if [ "$wpid" == "" ]; then
+	echo -e "No wpa_supplicant running on background\n"
+else
+	echo -n "Found wpa_supplicant running on background, stopping... "
+	kill $wpid
+	echo -e "OK\n"
+	# make sure that the interface is Up, after terminating background wpa_supplicant
+	ip link set $winterface up
+fi
+
+tmpfile="$(mktemp)"
+wpa_passphrase "${ssid[choice]}" "${password}" >> $tmpfile
+wpa_supplicant -B -i $winterface -c $tmpfile
+
+# lastly, make sure that the interface is Up
+ip link set $winterface up
