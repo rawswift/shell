@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+# Copyright (C) 2014 Ryan Yonzon
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+#
+# TODO
+#
+# (1) Add status (show master PID, number of workers and worker(s) PID)
+#
+
+pid_file="./pids/unicorn.pid"
+pid=
+signal=
+action=
+
+usage="Usage: $(basename "$0") [OPTIONS]
+Send signal to Unicorn. (Stop, Restart, etc)
+
+Options:
+    -P, --PID          Unicorn PID (Process ID)
+    -p, --pidf         Unicorn PID file (default: ./pids/unicorn.pid)
+    -r, --restart      Reloads config file and gracefully restart all workers.
+    -s, --stop         Graceful shutdown, waits for workers to finish their current request before finishing.
+    -q, --quick        Quick shutdown, kills all workers immediately.
+    -w, --worker       Gracefully stops workers but keep the master running. This will only work for daemonized processes.
+    -i, --increment    Increment the number of worker processes by one.
+    -d, --decrement    Decrement the number of worker processes by one.
+    -h, --help         Help
+
+Written by Ryan Yonzon"
+
+args=$(getopt -o P:p:rsqwidh -l "PID:,pidf:,restart,stop,quick,worker,increment,decrement,help" -n "unicorn_signal" -- "$@");
+
+if [ $? -ne 0 ]; then
+    echo "Bad arguments!"
+    echo "Use -h or --help parameter for help."
+    exit 1
+fi
+
+eval set -- "$args";
+
+while true; do
+    case "$1" in
+        -P|--PID)
+            shift;
+            if [ -n "$1" ]; then
+                pid=$1
+                shift
+            fi
+            ;;
+        -p|--pidf)
+            shift;
+            if [ -n "$1" ]; then
+                pid_file=$1
+                shift
+            fi
+            ;;
+        -r|--restart)
+            shift;
+            signal="HUP"
+            action="Restarting... "
+            ;;                
+        -s|--stop)
+            shift;
+            signal="QUIT"
+            action="Stopping... "
+            ;;
+        -q|--quick)
+            shift;
+            signal="TERM"
+            action="Quick stop/shutdown... "
+            ;;
+        -w|--worker)
+            shift;
+            signal="WINCH"
+            action="Stop workers... "
+            ;;
+
+        -i|--increment)
+            shift;
+            signal="TTIN"
+            action="Incrementing worker... "
+            ;;
+
+        -d|--decrement)
+            shift;
+            signal="TTOU"
+            action="Decrementing worker... "
+            ;;
+        -h|--help)
+            shift;
+            echo "${usage}"
+            exit
+            ;;
+        --)
+            shift;
+            break;
+    esac
+done
+
+# check PID
+if [ "$pid" == "" ]; then
+    if [ -f "$pid_file" ]; then
+        # read Unicorn PID file
+        while read line
+        do
+            pid=$line
+        done < $pid_file
+    else
+        printf "Checking for Unicorn... "
+        pid=$(ps aux | grep '[u]nicorn.*\?master' | awk '{print $2}')
+        printf "Done\n"
+
+        if [ "$pid" == "" ]; then
+            echo "No Unicorn running."
+            exit
+        else
+            echo -e "Unicorn master PID: $pid\n"
+        fi
+    fi
+fi
+
+# check signal
+if [ "$signal" == "" ]; then
+    echo "No signal specified."
+    echo -e "\n"
+    echo "Use -h or --help parameter for help."    
+    exit
+fi
+
+# if all goes well...
+
+printf "$action"
+
+# send signal using 'kill'
+kill -s $signal $pid
+
+# fin
+printf "Done\n"
