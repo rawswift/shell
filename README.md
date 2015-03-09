@@ -8,3 +8,5 @@ Linux shell script collection:
 * `vboxip` - Set `vboxnet0` (VirtualBox's Host-only) adapter's IP address.
 * `wifi-connect` - Find wireless interface and connect to wifi access point.
 * `unicorn_signal` - Send signal to Unicorn (Rack web server).
+* `battery_status` - Battery notification (low and fully charged).
+
